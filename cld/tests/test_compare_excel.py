@@ -181,6 +181,25 @@ def test_report_file_and_exit_codes():
     assert ce.main([str(a), str(a.parent / "missing.xlsx"), str(out)]) == 2
 
 
+def test_report_has_no_empty_freeze_pane():
+    """Excel repairs a sheet whose frozen pane has neither xSplit nor ySplit (the Summary sheet once had one)."""
+    import re
+    import zipfile
+
+    a, b = samples("make_number_samples.py", "numbers_A.xlsx", "numbers_B.xlsx")
+    out = a.parent / "report.xlsx"
+    for args in ([str(a), str(b), str(out), "--key", "txn id"], [str(a), str(a), str(out)]):
+        ce.main(args)
+        with zipfile.ZipFile(out) as z:
+            sheets = sorted(n for n in z.namelist() if n.startswith("xl/worksheets/sheet"))
+            assert len(sheets) == 5
+            for name in sheets:
+                xml = z.read(name).decode()
+                for pane in re.findall(r"<pane [^>]*>", xml):
+                    assert "xSplit" in pane or "ySplit" in pane, f"{name}: {pane}"
+            assert "<pane" not in z.read(sheets[0]).decode()          # Summary is not frozen at all
+
+
 if __name__ == "__main__":
     failed = 0
     for name, fn in sorted(globals().items()):

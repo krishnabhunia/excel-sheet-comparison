@@ -725,8 +725,10 @@ def write_report(res: Result, path_a: Path, path_b: Path, out: Path, header_row:
         "verdict_bad": wb.add_format({"font_name": "Calibri", "font_size": 14, "bold": True, "font_color": "#C00000"}),
     }
 
-    def table(ws, top, columns, rows, status_cols=(), empty="No differences found"):
-        """columns = [(title, width)]; a SrNo. column is added in front. Returns the next free row."""
+    def table(ws, top, columns, rows, status_cols=(), empty="No differences found", freeze=True):
+        """columns = [(title, width)]; a SrNo. column is added in front. Returns the next free row.
+        freeze=False leaves the sheet unfrozen. Never call freeze_panes(0, 0) to undo a freeze: xlsxwriter
+        then writes a pane with no split, which Excel reports as damaged content and repairs."""
         ws.set_column(0, 0, 6)
         ws.write(top, 0, "SrNo.", fmt["head"])
         for c, (title, width) in enumerate(columns, 1):
@@ -754,7 +756,8 @@ def write_report(res: Result, path_a: Path, path_b: Path, out: Path, header_row:
                             f"{len(rows) - MAX_REPORT_ROWS:,} more row(s) not listed (limit {MAX_REPORT_ROWS:,}).", fmt["label"])
         if shown:
             ws.autofilter(top, 0, top + len(shown), len(columns))
-        ws.freeze_panes(top + 1, 0)
+        if freeze:
+            ws.freeze_panes(top + 1, 0)
         ws.set_landscape(); ws.fit_to_pages(1, 0); ws.repeat_rows(top)
         return top + 2 + len(shown)
 
@@ -777,8 +780,8 @@ def write_report(res: Result, path_a: Path, path_b: Path, out: Path, header_row:
     rows = [[label, "DIFF" if res.count[key] else "MATCH",
              f"{res.count[key]:,} {unit}" if res.count[key] else "0", sheet]
             for label, key, unit, sheet in SUMMARY_CHECKS]
-    end = table(ws, 11, [("Check", 62), ("Result", 10), ("Differences", 16), ("Details in sheet", 20)], rows, status_cols={2})
-    ws.freeze_panes(0, 0)
+    end = table(ws, 11, [("Check", 62), ("Result", 10), ("Differences", 16), ("Details in sheet", 20)], rows, status_cols={2},
+                freeze=False)
     for i, note in enumerate(res.notes):
         ws.write(end + i, 1, f"Note: {note}", fmt["text"])
 
